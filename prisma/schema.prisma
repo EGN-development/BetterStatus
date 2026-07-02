@@ -293,6 +293,7 @@ model Subscriber {
   target    String            // email | telegram chat id | webhook url ...
   verified  Boolean           @default(false)
   lang      String            @default("en") // notification language
+  config    Json?             // per-subscriber options (e.g. Discord/Slack username + avatar)
   token     String            @unique @default(cuid())
   createdAt DateTime          @default(now())
 

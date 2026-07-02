@@ -33,6 +33,7 @@ export async function notifySubscribers(msg: AlertMessage): Promise<void> {
     subs.map((sub) => {
       const unsubscribeUrl = `${base}/unsubscribe?token=${sub.token}`;
       const m = { ...msg, siteName: settings.siteName, unsubscribeUrl };
+      const opts = (sub.config as { username?: string; avatarUrl?: string } | null) ?? {};
       switch (sub.channel) {
         case "EMAIL":
           return sendEmail(
@@ -50,9 +51,9 @@ export async function notifySubscribers(msg: AlertMessage): Promise<void> {
             settings
           );
         case "SLACK":
-          return sendSlack({ webhookUrl: sub.target }, m);
+          return sendSlack({ webhookUrl: sub.target, username: opts.username, avatarUrl: opts.avatarUrl }, m);
         case "DISCORD":
-          return sendDiscord({ webhookUrl: sub.target }, m);
+          return sendDiscord({ webhookUrl: sub.target, username: opts.username, avatarUrl: opts.avatarUrl }, m);
         case "WEBHOOK":
           return sendWebhook({ url: sub.target }, m);
         case "TELEGRAM":

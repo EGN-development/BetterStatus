@@ -56,18 +56,26 @@ export function SubscribeForm({ lang, telegramEnabled }: { lang: Lang; telegramE
             <Send className="size-4" /> {tgPending ? "…" : "Open Telegram bot"}
           </Button>
         ) : (
-          <form action={action} className="flex flex-1 flex-col gap-2 sm:flex-row">
+          <form action={action} className="flex-1 space-y-2">
             <input type="hidden" name="channel" value={channel} />
-            <Input
-              name="target"
-              type={channel === "EMAIL" ? "email" : "url"}
-              required
-              placeholder={placeholders[channel]}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={pending}>
-              <Bell className="size-4" /> {pending ? "…" : t("subscribe")}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                name="target"
+                type={channel === "EMAIL" ? "email" : "url"}
+                required
+                placeholder={placeholders[channel]}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={pending}>
+                <Bell className="size-4" /> {pending ? "…" : t("subscribe")}
+              </Button>
+            </div>
+            {(channel === "DISCORD" || channel === "SLACK") && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input name="username" placeholder="Bot name (optional)" />
+                <Input name="avatarUrl" type="url" placeholder="Avatar URL (optional)" />
+              </div>
+            )}
           </form>
         )}
       </div>

@@ -41,10 +41,18 @@ export async function subscribe(
   // non-email subscribers own their endpoint, so auto-verify them
   const verified = channel !== "EMAIL";
 
+  // per-subscriber display options for Discord/Slack
+  const username = String(formData.get("username") || "").trim().slice(0, 80) || undefined;
+  const avatarUrl = String(formData.get("avatarUrl") || "").trim() || undefined;
+  const cfg =
+    (channel === "DISCORD" || channel === "SLACK") && (username || avatarUrl)
+      ? { ...(username ? { username } : {}), ...(avatarUrl ? { avatarUrl } : {}) }
+      : undefined;
+
   const sub = await prisma.subscriber.upsert({
     where: { channel_target: { channel, target } },
-    update: {},
-    create: { channel, target, verified },
+    update: { config: cfg ?? undefined },
+    create: { channel, target, verified, config: cfg ?? undefined },
   });
 
   if (channel === "EMAIL" && !sub.verified) {
@@ -78,9 +86,9 @@ export async function subscribe(
     };
     const res =
       channel === "DISCORD"
-        ? await sendDiscord({ webhookUrl: target }, welcome)
+        ? await sendDiscord({ webhookUrl: target, username, avatarUrl }, welcome)
         : channel === "SLACK"
-          ? await sendSlack({ webhookUrl: target }, welcome)
+          ? await sendSlack({ webhookUrl: target, username, avatarUrl }, welcome)
           : await sendWebhook({ url: target }, welcome);
     if (!res.ok) {
       await prisma.subscriber.delete({ where: { id: sub.id } }).catch(() => {});
