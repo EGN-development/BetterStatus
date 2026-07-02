@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "Settings" ADD COLUMN     "showClusterAverages" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showCpuModel" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showCpuThreads" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showCpuUsage" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showDiskIo" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showDiskUsage" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showLoad" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showMemoryUsage" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showNetIo" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showNodeMetrics" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showTotalMemory" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showUptime" BOOLEAN NOT NULL DEFAULT true;

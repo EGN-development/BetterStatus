@@ -1,0 +1,376 @@
+// Better Status — data model
+// Open-source uptime monitoring + status page.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Auth / users ─────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  role         Role      @default(ADMIN)
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ───────────────────────── Global settings ─────────────────────────
+// Singleton row (id = "singleton").
+
+model Settings {
+  id              String   @id @default("singleton")
+  siteName        String   @default("Better Status")
+  siteDescription String   @default("Service status & uptime")
+  logoUrl         String?
+  faviconUrl      String?
+  theme           String   @default("midnight") // active theme key
+  allowSubscribers Boolean @default(true)
+  primaryColor    String?  // optional override
+  // Telegram subscriber bot
+  telegramBotToken    String?
+  telegramBotUsername String?
+  // Custom public colors (override the active theme when enabled)
+  useCustomColors Boolean @default(false)
+  colBg           String?
+  colCard         String?
+  colBorder       String?
+  colPrimary      String?
+  colForeground   String?
+  colMuted        String?
+  colMutedFg      String?
+  colSuccess      String?
+  colWarning      String?
+  colDanger       String?
+  // SMTP for outbound email (subscriber + alert email)
+  smtpHost        String?
+  smtpPort        Int?     @default(587)
+  smtpUser        String?
+  smtpPass        String?
+  smtpFrom        String?
+  smtpSecure      Boolean  @default(false)
+  // Public base URL (used for links in notifications / feeds)
+  publicUrl       String?
+  // Public read API
+  publicApiEnabled Boolean @default(false)
+  apiKey          String?  // optional — if set, required to call the API
+  apiMonitors     Boolean  @default(true)
+  apiIncidents    Boolean  @default(true)
+  apiMaintenance  Boolean  @default(true)
+  apiUptime       Boolean  @default(false)
+  apiMetrics      Boolean  @default(false)
+  // Public page display toggles (which metric fields are shown)
+  showClusterAverages Boolean @default(true)
+  showNodeMetrics     Boolean @default(true)
+  showCpuModel        Boolean @default(true)
+  showCpuThreads      Boolean @default(true)
+  showTotalMemory     Boolean @default(true)
+  showCpuUsage        Boolean @default(true)
+  showMemoryUsage     Boolean @default(true)
+  showDiskUsage       Boolean @default(true)
+  showLoad            Boolean @default(true)
+  showDiskIo          Boolean @default(true)
+  showNetIo           Boolean @default(true)
+  showUptime          Boolean @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+// ───────────────────────── Monitors ─────────────────────────
+
+enum MonitorType {
+  HTTP   // http(s) request
+  API    // http json/keyword/api ping
+  PING   // ICMP ping
+  TCP    // tcp port connect
+  UDP    // udp datagram
+  DNS    // dns resolution
+  CRON   // push / heartbeat (dead man's switch)
+}
+
+enum MonitorStatus {
+  PENDING
+  UP
+  DOWN
+  PAUSED
+  MAINTENANCE
+}
+
+model Monitor {
+  id          String        @id @default(cuid())
+  name        String
+  type        MonitorType
+  active      Boolean       @default(true)
+  group       String?       // optional grouping on the public page
+
+  // scheduling
+  intervalSeconds Int        @default(60)
+  timeoutSeconds  Int        @default(30)
+  retries         Int        @default(1) // failures before flipping to DOWN
+
+  // HTTP / API
+  url             String?
+  method          String?    @default("GET")
+  expectedStatus  String?    @default("200-299") // e.g. "200", "200-299", "200,301"
+  keyword         String?    // must be present in body
+  keywordInverted Boolean    @default(false) // keyword must be ABSENT
+  requestHeaders  Json?
+  requestBody     String?
+  followRedirects Boolean    @default(true)
+  ignoreTls       Boolean    @default(false)
+
+  // TCP / UDP / PING / DNS
+  host            String?
+  port            Int?
+  dnsRecordType   String?    @default("A")
+  dnsResolver     String?    // e.g. 1.1.1.1
+  dnsExpected     String?    // expected value contains
+
+  // CRON / heartbeat
+  heartbeatToken  String?    @unique // push URL token
+  graceSeconds    Int        @default(60)
+
+  // alerting
+  alertWebhookUrl   String?  // quick per-monitor webhook
+  notifySubscribers Boolean  @default(false)
+
+  // current state
+  status              MonitorStatus @default(PENDING)
+  lastCheckedAt       DateTime?
+  lastStatusChangeAt  DateTime?
+  lastResponseTimeMs  Int?
+  lastMessage         String?
+  consecutiveFails    Int           @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  checks      MonitorCheck[]
+  channels    NotificationChannel[] @relation("MonitorChannels")
+  incidents   Incident[]
+  maintenances Maintenance[]        @relation("MaintenanceMonitors")
+
+  @@index([active, status])
+}
+
+// ───────────────────────── Scheduled maintenance ─────────────────────────
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Maintenance {
+  id                String            @id @default(cuid())
+  title             String
+  body              String?
+  status            MaintenanceStatus @default(SCHEDULED)
+  scheduledStart    DateTime
+  scheduledEnd      DateTime
+  notifySubscribers Boolean           @default(false)
+  isPublic          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  monitors          Monitor[]         @relation("MaintenanceMonitors")
+
+  @@index([status, scheduledStart])
+}
+
+model MonitorCheck {
+  id             String        @id @default(cuid())
+  monitorId      String
+  monitor        Monitor       @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status         MonitorStatus
+  up             Boolean
+  responseTimeMs Int?
+  statusCode     Int?
+  message        String?
+  createdAt      DateTime      @default(now())
+
+  @@index([monitorId, createdAt])
+}
+
+// ───────────────────────── Notification channels (outbound alerts) ─────────────────────────
+
+enum ChannelType {
+  TELEGRAM
+  EMAIL
+  SLACK
+  DISCORD
+  WEBHOOK
+  API
+}
+
+model NotificationChannel {
+  id        String      @id @default(cuid())
+  name      String
+  type      ChannelType
+  enabled   Boolean     @default(true)
+  config    Json        // type-specific: { botToken, chatId } | { url } | { to } | { url, headers, ... }
+  createdAt DateTime    @default(now())
+  monitors  Monitor[]   @relation("MonitorChannels")
+}
+
+// ───────────────────────── Incidents ─────────────────────────
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+enum IncidentImpact {
+  NONE
+  MINOR
+  MAJOR
+  CRITICAL
+  MAINTENANCE
+}
+
+model Incident {
+  id         String           @id @default(cuid())
+  title      String
+  status     IncidentStatus   @default(INVESTIGATING)
+  impact     IncidentImpact   @default(MINOR)
+  isPublic   Boolean          @default(true)
+  auto       Boolean          @default(false) // auto-opened by monitor
+  monitorId  String?
+  monitor    Monitor?         @relation(fields: [monitorId], references: [id], onDelete: SetNull)
+  startedAt  DateTime         @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime         @default(now())
+  updates    IncidentUpdate[]
+
+  @@index([status, createdAt])
+}
+
+model IncidentUpdate {
+  id         String         @id @default(cuid())
+  incidentId String
+  incident   Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  status     IncidentStatus
+  body       String
+  createdAt  DateTime       @default(now())
+
+  @@index([incidentId, createdAt])
+}
+
+// ───────────────────────── Subscribers (public status page) ─────────────────────────
+
+enum SubscriberChannel {
+  EMAIL
+  TELEGRAM
+  SLACK
+  DISCORD
+  WEBHOOK
+}
+
+model Subscriber {
+  id        String            @id @default(cuid())
+  channel   SubscriberChannel
+  target    String            // email | telegram chat id | webhook url ...
+  verified  Boolean           @default(false)
+  lang      String            @default("en") // notification language
+  token     String            @unique @default(cuid())
+  createdAt DateTime          @default(now())
+
+  @@unique([channel, target])
+}
+
+// ───────────────────────── Server metrics agents ─────────────────────────
+
+model Pool {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(true) // show on the public status page
+  createdAt   DateTime @default(now())
+  agents      Agent[]
+}
+
+model Agent {
+  id          String        @id @default(cuid())
+  name        String
+  token       String        @unique
+  hostname    String?
+  os          String?
+  active      Boolean       @default(true)
+  public      Boolean       @default(true) // show this node on the public page
+  // per-node public display toggles
+  showCpuModel    Boolean @default(true)
+  showCpuThreads  Boolean @default(true)
+  showTotalMemory Boolean @default(true)
+  showCpuUsage    Boolean @default(true)
+  showMemoryUsage Boolean @default(true)
+  showDiskUsage   Boolean @default(true)
+  showLoad        Boolean @default(true)
+  showDiskIo      Boolean @default(true)
+  showNetIo       Boolean @default(true)
+  showUptime      Boolean @default(true)
+  // pool / cluster membership
+  poolId      String?
+  pool        Pool?         @relation(fields: [poolId], references: [id], onDelete: SetNull)
+  // static system info (reported by the agent)
+  cpuModel    String?
+  cpuThreads  Int?
+  // alert thresholds (percent); null = no alert
+  cpuThreshold  Int?
+  memThreshold  Int?
+  diskThreshold Int?
+  offlineSeconds Int         @default(120) // mark offline if no report within
+  online        Boolean      @default(false)
+  lastSeenAt    DateTime?
+  notifySubscribers Boolean  @default(false)
+  alertWebhookUrl   String?
+  createdAt   DateTime      @default(now())
+  metrics     AgentMetric[]
+
+  @@index([poolId])
+}
+
+model AgentMetric {
+  id         String   @id @default(cuid())
+  agentId    String
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  cpuPct     Float
+  memUsed    BigInt
+  memTotal   BigInt
+  swapUsed   BigInt?
+  swapTotal  BigInt?
+  diskUsed   BigInt
+  diskTotal  BigInt
+  netRxBytes BigInt   @default(0) // cumulative
+  netTxBytes BigInt   @default(0) // cumulative
+  netIoBytes BigInt   @default(0) // bytes/sec (rx+tx) sampled over 1s
+  diskIoBytes BigInt  @default(0) // bytes/sec (read+write) sampled over 1s
+  load1      Float?
+  load5      Float?
+  load15     Float?
+  uptimeSec  BigInt?
+  procCount  Int?
+  createdAt  DateTime @default(now())
+
+  @@index([agentId, createdAt])
+}

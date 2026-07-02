@@ -1,26 +1,166 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  Better Status — theming system.
+  Themes are selected by setting `data-theme="<key>"` on <html>.
+  All UI uses the semantic tokens below, so adding a theme = adding one block.
+*/
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --radius-base: var(--radius);
+  --font-sans: var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-mono: var(--font-geist-mono, ui-monospace, monospace);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ───── default (midnight) ───── */
+:root,
+[data-theme="midnight"] {
+  --background: #0b0f1a;
+  --foreground: #e6eaf2;
+  --card: #121828;
+  --card-foreground: #e6eaf2;
+  --muted: #1b2236;
+  --muted-foreground: #94a0bd;
+  --border: #232c44;
+  --input: #1b2236;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --accent: #1f2940;
+  --accent-foreground: #c7d0e8;
+  --ring: #6366f1;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #38bdf8;
+  --radius: 0.75rem;
 }
 
+/* ───── aurora (dark teal/emerald) ───── */
+[data-theme="aurora"] {
+  --background: #06121a;
+  --foreground: #dff5ef;
+  --card: #0c1f29;
+  --card-foreground: #dff5ef;
+  --muted: #112b36;
+  --muted-foreground: #7fa9aa;
+  --border: #1a3a45;
+  --input: #112b36;
+  --primary: #2dd4bf;
+  --primary-foreground: #03201c;
+  --accent: #143540;
+  --accent-foreground: #aee9df;
+  --ring: #2dd4bf;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #fb7185;
+  --info: #22d3ee;
+  --radius: 0.75rem;
+}
+
+/* ───── nocturne (dark purple) ───── */
+[data-theme="nocturne"] {
+  --background: #0e0b1a;
+  --foreground: #ece8f7;
+  --card: #181231;
+  --card-foreground: #ece8f7;
+  --muted: #221a45;
+  --muted-foreground: #a394d0;
+  --border: #2e2356;
+  --input: #221a45;
+  --primary: #a855f7;
+  --primary-foreground: #ffffff;
+  --accent: #271a4d;
+  --accent-foreground: #d6c6f5;
+  --ring: #a855f7;
+  --success: #4ade80;
+  --warning: #facc15;
+  --danger: #f43f5e;
+  --info: #818cf8;
+  --radius: 1rem;
+}
+
+/* ───── daylight (light blue) ───── */
+[data-theme="daylight"] {
+  --background: #f6f8fc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #eef2f9;
+  --muted-foreground: #5b6b85;
+  --border: #e2e8f3;
+  --input: #ffffff;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --accent: #e8eefc;
+  --accent-foreground: #1e3a8a;
+  --ring: #2563eb;
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #0284c7;
+  --radius: 0.625rem;
+}
+
+/* ───── paper (light minimal mono) ───── */
+[data-theme="paper"] {
+  --background: #faf9f7;
+  --foreground: #1c1b19;
+  --card: #ffffff;
+  --card-foreground: #1c1b19;
+  --muted: #f0eee9;
+  --muted-foreground: #6f6a60;
+  --border: #e4e0d8;
+  --input: #ffffff;
+  --primary: #1c1b19;
+  --primary-foreground: #faf9f7;
+  --accent: #efece5;
+  --accent-foreground: #1c1b19;
+  --ring: #1c1b19;
+  --success: #2f855a;
+  --warning: #b7791f;
+  --danger: #c53030;
+  --info: #2b6cb0;
+  --radius: 0.4rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* thin scrollbar in dark themes */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
