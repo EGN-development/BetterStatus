@@ -77,8 +77,31 @@ export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
   const token = settings.telegramBotToken;
   if (!token) return;
 
-  // /start <bindToken>
   const text = update.message?.text;
+
+  // /stop | /unsubscribe — leave the subscription
+  if (text && (text.startsWith("/stop") || text.startsWith("/unsubscribe"))) {
+    const chatId = String(update.message!.chat.id);
+    const sub = await prisma.subscriber.findUnique({
+      where: { channel_target: { channel: "TELEGRAM", target: chatId } },
+    });
+    const ru = sub?.lang === "ru";
+    const res = await prisma.subscriber.deleteMany({ where: { channel: "TELEGRAM", target: chatId } });
+    await sendTelegram(
+      token,
+      chatId,
+      res.count > 0
+        ? ru
+          ? "🔕 Вы отписались от уведомлений. Чтобы подписаться снова — нажмите «Подписаться» на статус-странице."
+          : "🔕 You have unsubscribed. To subscribe again, use the “Subscribe” button on the status page."
+        : ru
+          ? "Вы не были подписаны."
+          : "You weren't subscribed."
+    );
+    return;
+  }
+
+  // /start <bindToken>
   if (text && text.startsWith("/start")) {
     const chatId = String(update.message!.chat.id);
     const bindToken = text.split(/\s+/)[1];
@@ -115,6 +138,12 @@ export async function handleTelegramUpdate(update: TgUpdate): Promise<void> {
     const lang = cb.data.slice(5) === "ru" ? "ru" : "en";
     await prisma.subscriber.updateMany({ where: { channel: "TELEGRAM", target: chatId }, data: { lang } });
     await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id });
-    await sendTelegram(token, chatId, lang === "ru" ? "Язык уведомлений: <b>Русский</b> ✅" : "Notification language: <b>English</b> ✅");
+    await sendTelegram(
+      token,
+      chatId,
+      lang === "ru"
+        ? "Язык уведомлений: <b>Русский</b> ✅\n\n<i>🔕 /stop — отписаться в любой момент</i>"
+        : "Notification language: <b>English</b> ✅\n\n<i>🔕 /stop — unsubscribe anytime</i>"
+    );
   }
 }

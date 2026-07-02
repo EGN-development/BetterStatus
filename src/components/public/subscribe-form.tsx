@@ -4,19 +4,24 @@ import { useActionState, useState, useTransition } from "react";
 import { subscribe, createTelegramBindLink } from "@/lib/subscribe";
 import type { Lang } from "@/lib/i18n";
 import { translate } from "@/lib/i18n";
-import { Input } from "@/components/ui/input";
+import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Bell, Send } from "lucide-react";
 
-export function SubscribeForm({
-  lang,
-  telegramEnabled,
-}: {
-  lang: Lang;
-  telegramEnabled: boolean;
-}) {
+type Channel = "EMAIL" | "TELEGRAM" | "DISCORD" | "SLACK" | "WEBHOOK";
+
+const placeholders: Record<Channel, string> = {
+  EMAIL: "you@example.com",
+  TELEGRAM: "",
+  DISCORD: "https://discord.com/api/webhooks/…",
+  SLACK: "https://hooks.slack.com/services/…",
+  WEBHOOK: "https://your-endpoint.example.com/hook",
+};
+
+export function SubscribeForm({ lang, telegramEnabled }: { lang: Lang; telegramEnabled: boolean }) {
   const t = (k: Parameters<typeof translate>[1]) => translate(lang, k);
   const [state, action, pending] = useActionState(subscribe, null);
+  const [channel, setChannel] = useState<Channel>("EMAIL");
   const [tgPending, startTg] = useTransition();
   const [tgError, setTgError] = useState<string | null>(null);
 
@@ -29,29 +34,49 @@ export function SubscribeForm({
     });
   }
 
+  const channels: { value: Channel; label: string }[] = [
+    { value: "EMAIL", label: "Email" },
+    ...(telegramEnabled ? [{ value: "TELEGRAM" as Channel, label: "Telegram" }] : []),
+    { value: "DISCORD", label: "Discord webhook" },
+    { value: "SLACK", label: "Slack webhook" },
+    { value: "WEBHOOK", label: "Webhook" },
+  ];
+
   return (
     <div className="space-y-3">
-      <form action={action} className="flex flex-col gap-2 sm:flex-row">
-        <input type="hidden" name="channel" value="EMAIL" />
-        <Input name="target" type="email" required placeholder="you@example.com" className="flex-1" />
-        <Button type="submit" disabled={pending}>
-          <Bell className="size-4" /> {pending ? "…" : t("subscribe")}
-        </Button>
-      </form>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Select value={channel} onChange={(e) => setChannel(e.target.value as Channel)} className="sm:w-44">
+          {channels.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </Select>
 
-      {telegramEnabled && (
-        <div className="flex items-center gap-3">
-          <span className="h-px flex-1 bg-border" />
-          <span className="text-xs text-muted-foreground">or</span>
-          <span className="h-px flex-1 bg-border" />
-        </div>
-      )}
-      {telegramEnabled && (
-        <Button type="button" variant="outline" className="w-full" onClick={openTelegram} disabled={tgPending}>
-          <Send className="size-4" /> {tgPending ? "…" : "Telegram"}
-        </Button>
-      )}
+        {channel === "TELEGRAM" ? (
+          <Button type="button" variant="outline" className="flex-1" onClick={openTelegram} disabled={tgPending}>
+            <Send className="size-4" /> {tgPending ? "…" : "Open Telegram bot"}
+          </Button>
+        ) : (
+          <form action={action} className="flex flex-1 flex-col gap-2 sm:flex-row">
+            <input type="hidden" name="channel" value={channel} />
+            <Input
+              name="target"
+              type={channel === "EMAIL" ? "email" : "url"}
+              required
+              placeholder={placeholders[channel]}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={pending}>
+              <Bell className="size-4" /> {pending ? "…" : t("subscribe")}
+            </Button>
+          </form>
+        )}
+      </div>
 
+      {channel !== "EMAIL" && channel !== "TELEGRAM" && (
+        <p className="text-xs text-muted-foreground">
+          You&apos;ll get a confirmation now, and status + maintenance updates going forward. Unsubscribe link is included in every message.
+        </p>
+      )}
       {state?.message && <p className="text-sm text-success">{state.message}</p>}
       {state?.error && <p className="text-sm text-danger">{state.error}</p>}
       {tgError && <p className="text-sm text-danger">{tgError}</p>}

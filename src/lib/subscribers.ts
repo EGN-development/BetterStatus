@@ -27,10 +27,12 @@ export async function notifySubscribers(msg: AlertMessage): Promise<void> {
     (tgChannel?.config as { botToken?: string } | null)?.botToken ||
     process.env.TELEGRAM_BOT_TOKEN;
 
-  const branded = { ...msg, siteName: settings.siteName };
+  const base = publicUrl(settings);
 
   await Promise.allSettled(
     subs.map((sub) => {
+      const unsubscribeUrl = `${base}/unsubscribe?token=${sub.token}`;
+      const m = { ...msg, siteName: settings.siteName, unsubscribeUrl };
       switch (sub.channel) {
         case "EMAIL":
           return sendEmail(
@@ -42,20 +44,20 @@ export async function notifySubscribers(msg: AlertMessage): Promise<void> {
               body: msg.body,
               good: msg.good,
               url: msg.url,
-              unsubscribeUrl: `${publicUrl(settings)}/unsubscribe?token=${sub.token}`,
+              unsubscribeUrl,
               lang: sub.lang === "ru" ? "ru" : "en",
             }),
             settings
           );
         case "SLACK":
-          return sendSlack({ webhookUrl: sub.target }, branded);
+          return sendSlack({ webhookUrl: sub.target }, m);
         case "DISCORD":
-          return sendDiscord({ webhookUrl: sub.target }, branded);
+          return sendDiscord({ webhookUrl: sub.target }, m);
         case "WEBHOOK":
-          return sendWebhook({ url: sub.target }, branded);
+          return sendWebhook({ url: sub.target }, m);
         case "TELEGRAM":
           return botToken
-            ? sendTelegram({ botToken, chatId: sub.target }, branded)
+            ? sendTelegram({ botToken, chatId: sub.target }, m)
             : Promise.resolve({ ok: false });
         default:
           return Promise.resolve({ ok: false });

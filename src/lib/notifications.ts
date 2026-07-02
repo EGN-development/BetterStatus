@@ -15,6 +15,8 @@ export interface AlertMessage {
   url?: string;
   /** Optional branding shown in Slack/Discord footers. */
   siteName?: string;
+  /** When set (subscriber notifications), an unsubscribe affordance is added. */
+  unsubscribeUrl?: string;
 }
 
 // ───────────────────── low-level senders ─────────────────────
@@ -55,13 +57,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function sendTelegram(cfg: { botToken?: string; chatId?: string }, msg: AlertMessage): Promise<SendResult> {
   if (!cfg.botToken || !cfg.chatId) return { ok: false, error: "missing botToken/chatId" };
   const emoji = msg.good ? "✅" : "🔴";
-  const text = `${emoji} *${escapeMd(msg.title)}*\n${escapeMd(msg.body)}${msg.url ? `\n${msg.url}` : ""}`;
-  return postJson(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+  let text = `${emoji} <b>${escapeHtml(msg.title)}</b>\n\n${escapeHtml(msg.body)}`;
+  if (msg.url) text += `\n\n🔗 <a href="${msg.url}">${escapeHtml(msg.siteName || "Status page")}</a>`;
+  if (msg.unsubscribeUrl) text += `\n\n<i>🔕 /stop — unsubscribe</i>`;
+  const r = await postJson(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
     chat_id: cfg.chatId,
     text,
-    parse_mode: "Markdown",
+    parse_mode: "HTML",
     disable_web_page_preview: true,
   });
+  return { ok: r.ok, error: r.error };
 }
 
 export async function sendSlack(
@@ -76,7 +81,10 @@ export async function sendSlack(
       {
         color: msg.good ? "#22c55e" : "#ef4444",
         title: msg.title,
-        text: msg.body + (msg.url ? `\n<${msg.url}|View status page>` : ""),
+        text:
+          msg.body +
+          (msg.url ? `\n<${msg.url}|View status page>` : "") +
+          (msg.unsubscribeUrl ? `\n<${msg.unsubscribeUrl}|Unsubscribe>` : ""),
         footer: msg.siteName,
         ts: Math.floor(Date.now() / 1000),
       },
@@ -99,7 +107,11 @@ export async function sendDiscord(
     embeds: [
       {
         title: msg.title.slice(0, 256),
-        description: (msg.body + (msg.url ? `\n\n[View status page →](${msg.url})` : "")).slice(0, 4000),
+        description: (
+          msg.body +
+          (msg.url ? `\n\n[View status page →](${msg.url})` : "") +
+          (msg.unsubscribeUrl ? `\n[Unsubscribe](${msg.unsubscribeUrl})` : "")
+        ).slice(0, 4000),
         color: msg.good ? 0x22c55e : 0xef4444,
         timestamp: new Date().toISOString(),
         ...(msg.siteName ? { footer: { text: msg.siteName.slice(0, 2048) } } : {}),
@@ -162,6 +174,7 @@ export function webhookPayload(msg: AlertMessage, extra: Record<string, unknown>
     message: msg.body,
     status: msg.good ? "up" : "down",
     url: msg.url,
+    ...(msg.unsubscribeUrl ? { unsubscribeUrl: msg.unsubscribeUrl } : {}),
     timestamp: new Date().toISOString(),
     ...extra,
   };
